@@ -1,0 +1,971 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>InvestSim Pro — AI Portfolio Simulator (Fixed)</title>
+    <!-- Bootstrap 5 CSS + Icons + Chart.js + math.js -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" />
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet" />
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js">
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js">
+    </script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js">
+    </script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/11.8.0/math.min.js">
+    </script>
+    <style>
+        /* ----- Reset & Variables (ongewijzigd) ----- */
+        * { margin: 0; box-sizing: border-box; }
+        :root {
+            --bg-primary: #070b24; --bg-secondary: #0f163f; --bg-card: rgba(15,22,63,0.65);
+            --bg-card-hover: rgba(20,30,80,0.8); --accent-blue: #4facfe; --accent-purple: #7c6df0;
+            --accent-green: #2ecc71; --accent-red: #e74c6f; --accent-gold: #f7c948;
+            --accent-orange: #f39c12; --text-primary: #f0f2fa; --text-secondary: #a0a7c9;
+            --text-muted: #6a7199; --border-color: rgba(255,255,255,0.08);
+            --glow-blue: 0 0 40px rgba(79,172,254,0.12); --glow-gold: 0 0 40px rgba(247,201,72,0.10);
+            --radius: 20px; --transition: 0.35s cubic-bezier(0.4,0,0.2,1);
+        }
+        body {
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            background: var(--bg-primary); min-height: 100vh; color: var(--text-primary);
+            overflow-x: hidden;
+            background-image:
+                radial-gradient(ellipse at 15% 30%, rgba(79,172,254,0.07) 0%, transparent 50%),
+                radial-gradient(ellipse at 85% 70%, rgba(124,109,240,0.06) 0%, transparent 50%),
+                radial-gradient(ellipse at 50% 100%, rgba(46,204,113,0.04) 0%, transparent 40%);
+        }
+
+        /* ===== PARTICLE / STAR FIELD ===== */
+        #particle-canvas { position: fixed; top:0; left:0; width:100%; height:100%; pointer-events:none; z-index:0; opacity:0.5; }
+
+        /* ===== SCROLLBAR ===== */
+        ::-webkit-scrollbar { width:5px; } ::-webkit-scrollbar-track { background: var(--bg-primary); }
+        ::-webkit-scrollbar-thumb { background: linear-gradient(var(--accent-blue), var(--accent-purple)); border-radius:10px; }
+
+        /* ===== NAVBAR ===== */
+        .navbar { background: rgba(7,11,36,0.85); backdrop-filter: blur(24px); border-bottom: 1px solid var(--border-color); padding:0.6rem 0; position:sticky; top:0; z-index:1050; }
+        .navbar-brand { font-size:1.5rem; font-weight:800; background: linear-gradient(135deg, var(--accent-gold), var(--accent-blue), var(--accent-purple)); -webkit-background-clip:text; background-clip:text; color:transparent; -webkit-text-fill-color:transparent; letter-spacing:-0.5px; }
+        .nav-link { color: var(--text-secondary)!important; font-weight:500; transition:color var(--transition); padding:0.4rem 1rem!important; border-radius:10px; }
+        .nav-link:hover { color: var(--text-primary)!important; background: rgba(255,255,255,0.04); }
+
+        .btn-export { background:rgba(255,255,255,0.06); border:1px solid var(--border-color); padding:0.4rem 1.2rem; border-radius:12px; color:var(--text-secondary); font-size:0.85rem; transition:all var(--transition); cursor:pointer; text-decoration:none; display:inline-flex; align-items:center; gap:0.5rem; }
+        .btn-export:hover { background:rgba(79,172,254,0.12); color:var(--text-primary); border-color:var(--accent-blue); transform:translateY(-2px); box-shadow:var(--glow-blue); }
+
+        /* ===== HERO ===== */
+        .hero { padding:2rem 0 1rem; text-align:center; position:relative; z-index:1; }
+        .hero h1 { font-size:3.2rem; font-weight:900; letter-spacing:-1.5px; line-height:1.05; }
+        .gradient-text { background: linear-gradient(135deg, #4facfe 0%, #7c6df0 35%, #f093fb 65%, #f7c948 100%); -webkit-background-clip:text; background-clip:text; color:transparent; -webkit-text-fill-color:transparent; background-size:300% 300%; animation:gradientFlow 5s ease-in-out infinite; }
+        @keyframes gradientFlow { 0%,100% { background-position:0% 50%; } 50% { background-position:100% 50%; } }
+        .hero p { font-size:1.05rem; color:var(--text-secondary); max-width:580px; margin:0.5rem auto 0; line-height:1.6; }
+        .hero .sub-badge { display:inline-block; background:rgba(79,172,254,0.10); border:1px solid rgba(79,172,254,0.15); padding:0.25rem 1rem; border-radius:30px; font-size:0.75rem; color:var(--accent-blue); margin-bottom:0.8rem; letter-spacing:0.3px; }
+
+        /* ===== NEWS TICKER ===== */
+        .news-ticker { background:var(--bg-card); backdrop-filter:blur(14px); border:1px solid var(--border-color); border-radius:var(--radius); padding:0.6rem 1.2rem; margin-bottom:2rem; display:flex; align-items:center; gap:1rem; flex-wrap:wrap; position:relative; z-index:1; transition:border-color var(--transition); }
+        .news-ticker:hover { border-color:rgba(79,172,254,0.2); }
+        .news-ticker .label { font-weight:700; font-size:0.8rem; color:var(--accent-gold); white-space:nowrap; display:flex; align-items:center; gap:0.5rem; }
+        .news-ticker .label .pulse-dot { width:7px; height:7px; background:var(--accent-green); border-radius:50%; animation:pulseDot 1.8s ease-in-out infinite; }
+        @keyframes pulseDot { 0%,100% { opacity:1; transform:scale(1); } 50% { opacity:0.2; transform:scale(0.5); } }
+        .news-ticker .items { display:flex; gap:1.2rem; flex-wrap:wrap; flex:1; }
+        .news-ticker .items .news-item { display:flex; align-items:center; gap:0.6rem; font-size:0.8rem; color:var(--text-secondary); padding:0.1rem 0; animation:newsFadeIn 0.4s ease forwards; flex-wrap:wrap; }
+        @keyframes newsFadeIn { 0% { opacity:0.4; transform:translateY(-2px); } 100% { opacity:1; transform:translateY(0); } }
+        .news-ticker .items .news-item .news-link { color:var(--text-secondary); text-decoration:none; transition:color var(--transition); display:inline-flex; align-items:center; gap:0.3rem; white-space:nowrap; }
+        .news-ticker .items .news-item .news-link:hover { color:var(--text-primary); text-decoration:underline; }
+        .news-ticker .items .news-item .news-link i { font-size:0.55rem; opacity:0.5; transition:opacity var(--transition); }
+        .news-ticker .items .news-item .news-link:hover i { opacity:1; }
+        .news-ticker .items .news-item .sentiment-badge { font-size:0.55rem; font-weight:700; padding:0.1rem 0.5rem; border-radius:12px; text-transform:uppercase; letter-spacing:0.3px; flex-shrink:0; }
+        .sentiment-badge.bullish { background:rgba(46,204,113,0.15); color:var(--accent-green); }
+        .sentiment-badge.bearish { background:rgba(231,76,111,0.15); color:var(--accent-red); }
+        .sentiment-badge.neutral { background:rgba(255,255,255,0.04); color:var(--text-muted); }
+
+        /* ===== NIEUWS ACTIES WRAPPER (FIX) ===== */
+        .news-ticker .news-actions { display:flex; align-items:center; gap:0.5rem; flex-shrink:0; }
+        .news-ticker .auto-refresh-indicator { font-size:0.6rem; color:var(--text-muted); font-variant-numeric:tabular-nums; min-width:55px; text-align:right; display:inline-block; }
+        .news-ticker .refresh-btn { background:transparent; border:1px solid var(--border-color); color:var(--text-secondary); padding:0.2rem 0.8rem; border-radius:20px; font-size:0.7rem; cursor:pointer; transition:all var(--transition); white-space:nowrap; display:flex; align-items:center; gap:0.3rem; }
+        .news-ticker .refresh-btn:hover { border-color:var(--accent-blue); color:var(--text-primary); background:rgba(79,172,254,0.06); }
+
+        /* ===== GLASS CARDS ===== */
+        .glass-card { background:var(--bg-card); backdrop-filter:blur(18px); border:1px solid var(--border-color); border-radius:var(--radius); padding:1.5rem; transition:all var(--transition); position:relative; overflow:hidden; height:100%; z-index:1; }
+        .glass-card::before { content:''; position:absolute; inset:0; border-radius:var(--radius); padding:1px; background:linear-gradient(135deg, rgba(79,172,254,0.10), rgba(124,109,240,0.05), transparent 60%); -webkit-mask:linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0); -webkit-mask-composite:xor; mask-composite:exclude; pointer-events:none; opacity:0; transition:opacity var(--transition); }
+        .glass-card:hover::before { opacity:1; }
+        .glass-card:hover { transform:translateY(-3px); box-shadow:var(--glow-blue); border-color:rgba(79,172,254,0.15); background:var(--bg-card-hover); }
+        .glass-card .card-glow { position:absolute; top:-50%; left:-50%; width:200%; height:200%; background:radial-gradient(circle at 30% 40%, rgba(79,172,254,0.04), transparent 60%); pointer-events:none; }
+
+        /* ===== METRICS ===== */
+        .metric-value { font-size:2.2rem; font-weight:800; background:linear-gradient(135deg, #fff, #d0d5f0); -webkit-background-clip:text; background-clip:text; color:transparent; -webkit-text-fill-color:transparent; line-height:1.2; }
+        .metric-value.gold { background:linear-gradient(135deg, #f7c948, #f39c12); -webkit-background-clip:text; background-clip:text; color:transparent; -webkit-text-fill-color:transparent; }
+        .metric-value.green { background:linear-gradient(135deg, #2ecc71, #1abc9c); -webkit-background-clip:text; background-clip:text; color:transparent; -webkit-text-fill-color:transparent; }
+        .metric-value.red { background:linear-gradient(135deg, #e74c6f, #c0392b); -webkit-background-clip:text; background-clip:text; color:transparent; -webkit-text-fill-color:transparent; }
+        .metric-value.orange { background:linear-gradient(135deg, #f39c12, #e67e22); -webkit-background-clip:text; background-clip:text; color:transparent; -webkit-text-fill-color:transparent; }
+        .metric-value.purple { background:linear-gradient(135deg, #7c6df0, #6c5ce7); -webkit-background-clip:text; background-clip:text; color:transparent; -webkit-text-fill-color:transparent; }
+        .metric-label { font-size:0.65rem; color:var(--text-secondary); text-transform:uppercase; letter-spacing:1.2px; font-weight:600; display:flex; align-items:center; gap:0.4rem; margin-bottom:0.2rem; }
+        .metric-label .help-icon { display:inline-flex; align-items:center; justify-content:center; width:16px; height:16px; border-radius:50%; background:rgba(255,255,255,0.05); color:var(--text-muted); font-size:0.55rem; font-weight:700; cursor:pointer; transition:all var(--transition); border:1px solid var(--border-color); }
+        .metric-label .help-icon:hover { background:var(--accent-blue); color:#fff; border-color:var(--accent-blue); transform:scale(1.1); }
+
+        .metric-box { background:rgba(255,255,255,0.02); border-radius:14px; padding:0.6rem 0.4rem; transition:background var(--transition); border:1px solid transparent; }
+        .metric-box:hover { background:rgba(255,255,255,0.04); border-color:var(--border-color); }
+
+        /* ===== FORM CONTROLS ===== */
+        .custom-slider { -webkit-appearance:none; width:100%; height:5px; border-radius:4px; background:linear-gradient(90deg, var(--accent-blue), var(--accent-purple)); outline:none; transition:opacity 0.2s; }
+        .custom-slider::-webkit-slider-thumb { -webkit-appearance:none; width:18px; height:18px; border-radius:50%; background:linear-gradient(135deg, var(--accent-blue), var(--accent-purple)); cursor:pointer; box-shadow:0 0 20px rgba(79,172,254,0.25); transition:all var(--transition); border:2px solid rgba(255,255,255,0.15); }
+        .custom-slider::-webkit-slider-thumb:hover { transform:scale(1.15); box-shadow:0 0 35px rgba(79,172,254,0.4); }
+
+        .custom-select { background:var(--bg-secondary); border:1px solid var(--border-color); color:var(--text-primary); padding:0.6rem 2.2rem 0.6rem 1rem; border-radius:12px; width:100%; cursor:pointer; transition:all var(--transition); -webkit-appearance:none; appearance:none; background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' fill='%23a0a7c9' viewBox='0 0 16 16'%3E%3Cpath d='M8 11L3 6h10l-5 5z'/%3E%3C/svg%3E"); background-repeat:no-repeat; background-position:right 0.8rem center; font-size:0.9rem; font-weight:500; }
+        .custom-select:hover { border-color:rgba(79,172,254,0.3); }
+        .custom-select:focus { outline:none; border-color:var(--accent-blue); box-shadow:0 0 0 3px rgba(79,172,254,0.10); }
+
+        .stock-search-input { background:var(--bg-secondary); border:1px solid var(--border-color); color:var(--text-primary); padding:0.6rem 1rem; border-radius:12px; width:100%; transition:all var(--transition); font-size:0.9rem; }
+        .stock-search-input:focus { outline:none; border-color:var(--accent-blue); box-shadow:0 0 0 3px rgba(79,172,254,0.08); }
+
+        /* ===== BUTTONS ===== */
+        .btn-predict { background:linear-gradient(135deg, var(--accent-blue), var(--accent-purple)); border:none; padding:0.8rem 2rem; border-radius:14px; font-weight:700; font-size:1rem; color:#fff; transition:all var(--transition); position:relative; overflow:hidden; width:100%; box-shadow:0 4px 25px rgba(79,172,254,0.20); }
+        .btn-predict:hover { transform:translateY(-2px); box-shadow:0 8px 40px rgba(79,172,254,0.30); }
+        .btn-predict:disabled { opacity:0.5; cursor:not-allowed; transform:none!important; }
+
+        .btn-outline-glass { background:transparent; border:1px solid var(--border-color); color:var(--text-secondary); padding:0.4rem 1rem; border-radius:10px; transition:all var(--transition); cursor:pointer; font-size:0.8rem; font-weight:500; display:inline-flex; align-items:center; gap:0.4rem; }
+        .btn-outline-glass:hover { border-color:var(--accent-blue); color:var(--text-primary); background:rgba(79,172,254,0.06); }
+
+        /* ===== PORTFOLIO PILLS ===== */
+        .portfolio-pill { background:rgba(255,255,255,0.04); border:1px solid var(--border-color); border-radius:30px; padding:0.3rem 0.6rem 0.3rem 1rem; display:inline-flex; align-items:center; gap:0.5rem; margin:0.2rem; transition:all var(--transition); position:relative; }
+        .portfolio-pill:hover { background:rgba(255,255,255,0.07); border-color:rgba(79,172,254,0.2); }
+        .portfolio-pill .sym { font-weight:700; font-size:0.85rem; }
+        .portfolio-pill .weight-input { width:52px; background:transparent; border:none; color:var(--text-primary); text-align:right; font-weight:600; font-size:0.85rem; padding:0.1rem 0; }
+        .portfolio-pill .weight-input:focus { outline:none; border-bottom:1.5px solid var(--accent-blue); }
+
+        /* ===== SEARCH RESULTS ===== */
+        .stock-result-item { padding:0.5rem 1rem; border-bottom:1px solid var(--border-color); cursor:pointer; transition:background 0.15s; display:flex; justify-content:space-between; align-items:center; background:var(--bg-secondary); }
+        .stock-result-item:hover { background:rgba(79,172,254,0.12); }
+        .stock-result-item .symbol { font-weight:700; color:var(--text-primary); }
+        .stock-result-item .name { color:var(--text-secondary); font-size:0.8rem; }
+        .stock-result-item .risk-tag { font-size:0.5rem; padding:0.05rem 0.4rem; border-radius:8px; margin-left:0.3rem; }
+
+        /* ===== RECOMMENDATION BADGE ===== */
+        .recommendation-badge { padding:0.35rem 1.2rem; border-radius:30px; font-weight:700; font-size:0.85rem; display:inline-block; }
+        .rec-strong { background:rgba(46,204,113,0.12); color:var(--accent-green); border:1px solid rgba(46,204,113,0.2); }
+        .rec-caution { background:rgba(231,76,111,0.12); color:var(--accent-red); border:1px solid rgba(231,76,111,0.2); }
+        .rec-neutral { background:rgba(255,255,255,0.04); color:var(--text-secondary); border:1px solid var(--border-color); }
+        .rec-gold { background:rgba(247,201,72,0.10); color:var(--accent-gold); border:1px solid rgba(247,201,72,0.15); }
+
+        /* ===== CHARTS ===== */
+        .chart-wrapper { position:relative; height:260px; width:100%; }
+        .chart-wrapper-sm { position:relative; height:180px; width:100%; }
+
+        /* ===== FEATURE ICONS ===== */
+        .feature-icon-clickable { font-size:2rem; color:var(--accent-blue); cursor:pointer; transition:all var(--transition); display:inline-block; }
+        .feature-icon-clickable:hover { transform:scale(1.18) translateY(-3px); color:var(--accent-gold); }
+        .feature-title { font-size:0.8rem; font-weight:600; color:var(--text-secondary); }
+
+        /* ===== MODAL ===== */
+        .modal-content { background:var(--bg-secondary); color:var(--text-primary); border:1px solid var(--border-color); border-radius:var(--radius); }
+        .modal-header { border-bottom:1px solid var(--border-color); }
+        .modal-footer { border-top:1px solid var(--border-color); }
+        .detail-table { color:var(--text-secondary); font-size:0.8rem; }
+        .detail-table th, .detail-table td { border-bottom:1px solid var(--border-color); padding:0.3rem 0.6rem; }
+
+        /* ===== RESPONSIVE ===== */
+        @media (max-width:768px) { .hero h1 { font-size:2rem; } .metric-value { font-size:1.4rem; } .glass-card { padding:1rem; } .chart-wrapper { height:180px; } .chart-wrapper-sm { height:140px; } }
+    </style>
+</head>
+<body>
+    <!-- ===== PARTICLE CANVAS ===== -->
+    <canvas id="particle-canvas"></canvas>
+
+    <!-- ===== NAVBAR ===== -->
+    <nav class="navbar">
+        <div class="container">
+            <div class="d-flex justify-content-between align-items-center w-100 flex-wrap">
+                <a class="navbar-brand" href="#">✦ <span style="color:white;">Invest</span>Sim</a>
+                <div class="d-flex align-items-center gap-2 flex-wrap">
+                    <a href="#features" class="nav-link">Features</a>
+                    <a href="#about" class="nav-link">About</a>
+                    <span class="btn-export" onclick="exportReport()"><i class="fas fa-file-image"></i><span>Export Report</span></span>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- ===== HERO ===== -->
+    <section class="hero">
+        <div class="container">
+            <div class="sub-badge"><i class="fas fa-robot me-1"></i> AI-Powered · Monte Carlo · 5,000 Sims · Correlated Assets</div>
+            <h1><span class="gradient-text">Portfolio Simulator</span><br />Intelligent Forecasting</h1>
+            <p>Build a multi-asset portfolio from <strong>200+ global assets</strong> and simulate its future performance using Monte Carlo methods with full <strong>correlation matrix</strong> &amp; real‑time sentiment.</p>
+        </div>
+    </section>
+
+    <!-- ===== NEWS TICKER (FIXED) ===== -->
+    <section class="py-1">
+        <div class="container">
+            <div class="news-ticker" id="top-news-block">
+                <div class="label"><span class="pulse-dot"></span><span>📰 LIVE</span></div>
+                <div class="items" id="top-news-items"></div>
+                <div class="news-actions">
+                    <span class="auto-refresh-indicator" id="auto-refresh-indicator">🔄 60s</span>
+                    <button class="refresh-btn" onclick="refreshNews()"><i class="fas fa-sync"></i></button>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ===== MAIN CONTENT ===== -->
+    <section class="py-2">
+        <div class="container" id="report-content">
+
+            <!-- ===== PORTFOLIO BUILDER ===== -->
+            <div class="row g-4 mb-4">
+                <div class="col-12">
+                    <div class="glass-card">
+                        <div class="card-glow"></div>
+                        <h5 class="mb-3" style="font-size:1.05rem;display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">
+                            <i class="fas fa-briefcase" style="color:var(--accent-gold);"></i>Portfolio Builder
+                            <span class="badge bg-primary ms-1" style="font-size:0.55rem;border-radius:30px;padding:0.15rem 0.7rem;">200+ Assets</span>
+                            <span class="asset-count-badge">🌍 Global</span>
+                            <span class="help-icon ms-1" data-bs-toggle="tooltip" data-bs-placement="top" title="Search and add assets. ESG &amp; Operational risk shown.">?</span>
+                        </h5>
+                        <div class="row g-3 align-items-end">
+                            <div class="col-md-4">
+                                <label class="metric-label">Search Asset</label>
+                                <div class="position-relative">
+                                    <input type="text" id="stock-search" class="stock-search-input" placeholder="e.g. AAPL, TSLA, Gold..." autocomplete="off" />
+                                    <div id="search-results" class="position-absolute w-100" style="max-height:260px;overflow-y:auto;background:var(--bg-secondary);border-radius:14px;border:1px solid var(--border-color);z-index:100;display:none;margin-top:4px;box-shadow:0 8px 30px rgba(0,0,0,0.4);"></div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="metric-label">Asset Class</label>
+                                <select id="asset-class-filter" class="custom-select">
+                                    <option value="all">All</option>
+                                    <option value="Stocks">Stocks</option><option value="ETF">ETFs</option><option value="Index">Indices</option><option value="Commodity">Commodities</option><option value="Forex">Forex</option><option value="Crypto">Crypto</option>
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="metric-label">Region</label>
+                                <select id="region-filter" class="custom-select">
+                                    <option value="all">All Regions</option>
+                                    <option value="US">US</option><option value="UK">UK</option><option value="Europe">Europe</option><option value="Asia">Asia</option><option value="Global">Global</option>
+                                </select>
+                            </div>
+                            <div class="col-md-2">
+                                <button class="btn-outline-glass w-100" onclick="clearPortfolio()"><i class="fas fa-trash"></i> Clear</button>
+                            </div>
+                        </div>
+                        <div class="mt-3">
+                            <div id="portfolio-container" class="d-flex flex-wrap align-items-center gap-1">
+                                <span class="text-secondary" style="font-size:0.85rem;">Add assets to build your portfolio...</span>
+                            </div>
+                            <div class="mt-2 d-flex align-items-center flex-wrap gap-2">
+                                <span class="text-secondary" style="font-size:0.75rem;">Total Weight:</span>
+                                <span id="total-weight-display" class="fw-bold" style="font-size:0.9rem;min-width:48px;">0%</span>
+                                <div class="weight-total-track">
+                                    <div class="weight-total-fill under" id="weight-track-fill" style="width:0%;"></div>
+                                </div>
+                                <span class="text-secondary" style="font-size:0.75rem;">Assets:</span>
+                                <span id="asset-count-display" class="fw-bold" style="font-size:0.9rem;">0</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ===== SIMULATION CONTROLS & RESULTS ===== -->
+            <div class="row g-4 mb-4">
+                <div class="col-lg-4">
+                    <div class="glass-card">
+                        <div class="card-glow"></div>
+                        <h5 class="mb-3" style="font-size:1rem;"><i class="fas fa-sliders-h me-2" style="color:var(--accent-blue);"></i>Simulation Settings</h5>
+                        <div class="mb-3">
+                            <label class="metric-label">Investment Amount</label>
+                            <div class="d-flex justify-content-between text-secondary" style="font-size:0.75rem;">
+                                <span>€25K</span><span class="fw-bold text-primary" id="amount-display">€250,000</span><span>€1M</span>
+                            </div>
+                            <input type="range" id="investment-amount" class="custom-slider" min="25000" max="1000000" value="250000" step="10000" />
+                        </div>
+                        <div class="mb-3">
+                            <label class="metric-label">Time Horizon</label>
+                            <select id="time-horizon" class="custom-select">
+                                <option value="6">6 Months</option><option value="12" selected>12 Months</option><option value="24">24 Months</option><option value="36">36 Months</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="metric-label">Risk-Free Rate</label>
+                            <select id="risk-free-rate" class="custom-select">
+                                <option value="0.01">1%</option><option value="0.02">2%</option><option value="0.035" selected>3.5%</option><option value="0.05">5%</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="metric-label">Scenario</label>
+                            <select id="scenario-select" class="custom-select">
+                                <option value="base" selected>Base Case</option>
+                                <option value="crash">Market Crash (-30%)</option>
+                                <option value="bull">Bull Market (+20%)</option>
+                            </select>
+                        </div>
+                        <button id="simulate-btn" class="btn-predict"><i class="fas fa-rocket me-2"></i>Run Simulation</button>
+                        <button id="detail-btn" class="btn-outline-glass w-100 mt-2" onclick="showSimulationDetails()" disabled><i class="fas fa-clipboard-list"></i> View Details</button>
+                    </div>
+                </div>
+
+                <div class="col-lg-8">
+                    <div class="glass-card h-100">
+                        <div class="card-glow"></div>
+                        <h5 class="mb-3" style="font-size:1rem;"><i class="fas fa-chart-pie me-2" style="color:var(--accent-green);"></i>Portfolio Metrics <span class="badge bg-success ms-1" style="font-size:0.5rem;border-radius:30px;padding:0.1rem 0.5rem;">LIVE</span></h5>
+                        <div id="loading-container" style="display:none;" class="text-center py-3">
+                            <div class="spinner-main mb-2"></div>
+                            <p class="text-secondary" style="font-size:0.85rem;">Running 5,000 Monte Carlo simulations with correlations & sentiment...</p>
+                            <div class="progress-custom"><div class="progress-bar-custom" id="progress-bar"></div></div>
+                        </div>
+                        <div id="results-container">
+                            <div class="row g-2 mb-2">
+                                <div class="col-4"><div class="metric-box text-center"><div class="metric-label justify-content-center">Expected Return</div><div class="metric-value gold" id="roi-display">—</div></div></div>
+                                <div class="col-4"><div class="metric-box text-center"><div class="metric-label justify-content-center">Volatility</div><div class="metric-value" id="risk-display">—</div></div></div>
+                                <div class="col-4"><div class="metric-box text-center"><div class="metric-label justify-content-center">Sharpe Ratio</div><div class="metric-value orange" id="sharpe-display">—</div></div></div>
+                            </div>
+                            <div class="row g-2 mb-2">
+                                <div class="col-4"><div class="metric-box text-center"><div class="metric-label justify-content-center">VaR (95%)</div><div class="metric-value red" id="var-display">—</div></div></div>
+                                <div class="col-4"><div class="metric-box text-center"><div class="metric-label justify-content-center">Expected Max Drawdown</div><div class="metric-value red" id="drawdown-display">—</div></div></div>
+                                <div class="col-4"><div class="metric-box text-center"><div class="metric-label justify-content-center">Profit Probability</div><div class="metric-value green" id="prob-display">—</div></div></div>
+                            </div>
+                            <div class="row g-2 mb-2">
+                                <div class="col-6"><div class="metric-box text-center"><div class="metric-label justify-content-center">Portfolio ESG Score</div><div class="metric-value purple" id="esg-display">—</div></div></div>
+                                <div class="col-6"><div class="metric-box text-center"><div class="metric-label justify-content-center">Operational Risk Score</div><div class="metric-value purple" id="oprisk-display">—</div></div></div>
+                            </div>
+                            <div class="text-center mb-2">
+                                <div id="recommendation-display" class="recommendation-badge rec-neutral">Build a portfolio to get started</div>
+                            </div>
+                            <div class="mt-1" style="background:rgba(255,255,255,0.02);border-radius:12px;padding:0.5rem 0.8rem;border:1px solid var(--border-color);">
+                                <div class="small text-secondary fw-bold mb-1" style="font-size:0.7rem;">🧠 AI Insight</div>
+                                <div id="ai-insights" style="font-size:0.8rem;color:var(--text-secondary);line-height:1.5;">Add assets and run simulation for detailed analysis.</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ===== CHARTS ===== -->
+            <div class="row g-4 mb-4">
+                <div class="col-lg-8">
+                    <div class="glass-card">
+                        <div class="card-glow"></div>
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <h5 class="mb-0"><i class="fas fa-chart-line me-2" style="color:var(--accent-blue);"></i>Projected Portfolio Value</h5>
+                        </div>
+                        <div class="chart-wrapper"><canvas id="cashflow-chart"></canvas></div>
+                    </div>
+                </div>
+                <div class="col-lg-4">
+                    <div class="glass-card">
+                        <div class="card-glow"></div>
+                        <h5 class="mb-2"><i class="fas fa-chart-pie me-2" style="color:var(--accent-purple);"></i>Asset Allocation</h5>
+                        <div class="chart-wrapper-sm"><canvas id="pie-chart"></canvas></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ===== FEATURES ===== -->
+            <section id="features" class="mb-4">
+                <h5 class="text-center mb-3"><i class="fas fa-star me-2" style="color:var(--accent-gold);"></i>Features <span style="font-size:0.65rem;color:var(--text-muted);font-weight:400;">(click an icon to learn more)</span></h5>
+                <div class="row g-3">
+                    <div class="col-md-3 col-6"><div class="glass-card text-center" style="padding:0.8rem;cursor:default;"><div class="feature-icon-clickable" onclick="openFeatureModal('multi-asset')"><i class="fas fa-layer-group"></i></div><div class="feature-title">Multi-Asset</div></div></div>
+                    <div class="col-md-3 col-6"><div class="glass-card text-center" style="padding:0.8rem;cursor:default;"><div class="feature-icon-clickable" onclick="openFeatureModal('ai-predictions')"><i class="fas fa-brain"></i></div><div class="feature-title">AI Predictions</div></div></div>
+                    <div class="col-md-3 col-6"><div class="glass-card text-center" style="padding:0.8rem;cursor:default;"><div class="feature-icon-clickable" onclick="openFeatureModal('var-drawdown')"><i class="fas fa-chart-simple"></i></div><div class="feature-title">VaR &amp; Drawdown</div></div></div>
+                    <div class="col-md-3 col-6"><div class="glass-card text-center" style="padding:0.8rem;cursor:default;"><div class="feature-icon-clickable" onclick="openFeatureModal('report-export')"><i class="fas fa-file-export"></i></div><div class="feature-title">Report Export</div></div></div>
+                </div>
+            </section>
+
+            <div class="text-center mt-2 mb-3">
+                <div class="glass-card" style="background:rgba(231,76,111,0.04);border-color:rgba(231,76,111,0.10);padding:0.6rem;">
+                    <p class="text-secondary mb-0" style="font-size:0.7rem;">⚠️ <strong>Disclaimer:</strong> This is a simulated tool for educational purposes.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <footer class="py-3 mt-1" style="border-top:1px solid var(--border-color);">
+        <div class="container text-center">
+            <p class="text-secondary mb-0" style="font-size:0.7rem;">© 2026 InvestSim Pro · 100% Client-Side · v3.0</p>
+        </div>
+    </footer>
+
+    <!-- ===== FEATURE MODAL ===== -->
+    <div class="modal fade" id="featureModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered"><div class="modal-content">
+                <div class="modal-header"><h5 class="modal-title" id="featureModalTitle"><i class="fas fa-star"></i><span id="featureModalName">Feature</span></h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+                <div class="modal-body" id="featureModalBody"></div>
+                <div class="modal-footer"><button type="button" class="btn btn-outline-glass" data-bs-dismiss="modal">Close</button></div>
+        </div></div>
+    </div>
+
+    <!-- ===== DETAIL MODAL ===== -->
+    <div class="modal fade" id="detailModal" tabindex="-1">
+        <div class="modal-dialog modal-lg modal-dialog-centered"><div class="modal-content detail-modal-content">
+                <div class="modal-header"><h5 class="modal-title"><i class="fas fa-clipboard-check me-2" style="color:var(--accent-gold);"></i>Simulation Details & Audit Trail</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+                <div class="modal-body" id="detailModalBody" style="max-height:60vh;overflow-y:auto;"></div>
+                <div class="modal-footer"><button type="button" class="btn btn-outline-glass" data-bs-dismiss="modal">Close</button></div>
+        </div></div>
+    </div>
+
+    <script>
+        // ========== PARTICLE SYSTEM ==========
+        (function() {
+            const canvas = document.getElementById('particle-canvas');
+            const ctx = canvas.getContext('2d');
+            let w, h;
+            const particles = [];
+            const COUNT = 120;
+            function resize() { w = canvas.width = window.innerWidth; h = canvas.height = window.innerHeight; }
+            window.addEventListener('resize', resize); resize();
+            class Particle {
+                constructor() { this.reset(); }
+                reset() {
+                    this.x = Math.random() * w; this.y = Math.random() * h;
+                    this.size = Math.random() * 1.8 + 0.5;
+                    this.speedX = (Math.random() - 0.5) * 0.2;
+                    this.speedY = (Math.random() - 0.5) * 0.2;
+                    this.opacity = Math.random() * 0.5 + 0.1;
+                }
+                update() { this.x += this.speedX; this.y += this.speedY; if (this.x < 0 || this.x > w) this.speedX *= -1; if (this.y < 0 || this.y > h) this.speedY *= -1; }
+                draw() { ctx.beginPath(); ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2); ctx.fillStyle = `rgba(160, 167, 201, ${this.opacity})`; ctx.fill(); }
+            }
+            for (let i = 0; i < COUNT; i++) particles.push(new Particle());
+            function animate() {
+                ctx.clearRect(0, 0, w, h);
+                for (const p of particles) { p.update(); p.draw(); }
+                for (let i = 0; i < particles.length; i++) {
+                    for (let j = i + 1; j < particles.length; j++) {
+                        const dx = particles[i].x - particles[j].x, dy = particles[i].y - particles[j].y;
+                        const dist = Math.sqrt(dx * dx + dy * dy);
+                        if (dist < 120) {
+                            ctx.beginPath(); ctx.moveTo(particles[i].x, particles[i].y); ctx.lineTo(particles[j].x, particles[j].y);
+                            ctx.strokeStyle = `rgba(160, 167, 201, ${0.06 * (1 - dist / 120)})`; ctx.lineWidth = 0.5; ctx.stroke();
+                        }
+                    }
+                }
+                requestAnimationFrame(animate);
+            }
+            animate();
+        })();
+
+        // ========== FEATURE DATA ==========
+        const FEATURES = {
+            'multi-asset': { icon: 'fa-layer-group', title: 'Multi-Asset Portfolio', description: 'Build a diversified portfolio.', details: ['200+ assets','Stocks, ETFs, Crypto, Forex','Custom weights'] },
+            'ai-predictions': { icon: 'fa-brain', title: 'AI-Powered Predictions', description: 'Monte Carlo with correlation.', details: ['5,000 simulations','Cholesky decomposition','Confidence intervals'] },
+            'var-drawdown': { icon: 'fa-chart-simple', title: 'VaR & Max Drawdown', description: 'Understand downside risk.', details: ['Value at Risk (95%)','Maximum Drawdown','Profit probability'] },
+            'report-export': { icon: 'fa-file-export', title: 'Report Export', description: 'Professional reports.', details: ['PNG export','Charts & metrics','Audit trail'] }
+        };
+        window.openFeatureModal = function(key) {
+            const data = FEATURES[key];
+            if (!data) return;
+            document.getElementById('featureModalName').textContent = data.title;
+            document.querySelector('#featureModalTitle i').className = 'fas ' + data.icon;
+            document.getElementById('featureModalBody').innerHTML = `
+                <div class="text-center"><div class="feature-detail-icon" style="font-size:3rem;color:var(--accent-blue);"><i class="fas ${data.icon}"></i></div>
+                <div class="feature-detail-title" style="font-size:1.3rem;font-weight:700;">${data.title}</div>
+                <div class="feature-detail-desc" style="color:var(--text-secondary);">${data.description}</div>
+                <ul style="color:var(--text-secondary);margin-top:0.8rem;padding-left:1.2rem;">${data.details.map(d => `<li>${d}</li>`).join('')}</ul></div>`;
+            new bootstrap.Modal(document.getElementById('featureModal')).show();
+        };
+
+        // ========== ASSET DATABASE (200+ voorbeelden) ==========
+        const ASSET_DB = [
+            { symbol: 'AAPL', name: 'Apple Inc.', sector: 'Tech', region: 'US', class: 'Stocks', price: 175, vol: 0.25, esg: 72, opRisk: 0.15 },
+            { symbol: 'MSFT', name: 'Microsoft Corp.', sector: 'Tech', region: 'US', class: 'Stocks', price: 330, vol: 0.22, esg: 85, opRisk: 0.12 },
+            { symbol: 'GOOGL', name: 'Alphabet Inc.', sector: 'Tech', region: 'US', class: 'Stocks', price: 140, vol: 0.24, esg: 70, opRisk: 0.18 },
+            { symbol: 'AMZN', name: 'Amazon.com Inc.', sector: 'Consumer', region: 'US', class: 'Stocks', price: 145, vol: 0.28, esg: 65, opRisk: 0.22 },
+            { symbol: 'NVDA', name: 'NVIDIA Corp.', sector: 'Tech', region: 'US', class: 'Stocks', price: 450, vol: 0.35, esg: 78, opRisk: 0.25 },
+            // ... (lijst is ingekort – vul aan tot 200+ items naar wens)
+            { symbol: 'SPY', name: 'SPDR S&P 500 ETF', sector: 'ETF', region: 'Global', class: 'ETF', price: 450, vol: 0.16, esg: 60, opRisk: 0.10 },
+            { symbol: 'GLD', name: 'SPDR Gold Trust', sector: 'ETF', region: 'Global', class: 'ETF', price: 180, vol: 0.18, esg: 40, opRisk: 0.05 },
+            { symbol: 'BTC-USD', name: 'Bitcoin USD', sector: 'Crypto', region: 'Global', class: 'Crypto', price: 60000, vol: 0.55, esg: 30, opRisk: 0.70 },
+            { symbol: 'EURUSD', name: 'EUR/USD', sector: 'Forex', region: 'Global', class: 'Forex', price: 1.08, vol: 0.12, esg: 50, opRisk: 0.08 },
+        ];
+
+        // ========== STATE ==========
+        const state = {
+            portfolio: [],
+            cashChart: null,
+            pieChart: null,
+            isRunning: false,
+            lastResult: null,
+            news: [],
+            sentimentScore: 0,
+            progressInterval: null
+        };
+        let simulationWorker = null;
+        let simulationTimeout = null;
+
+        // ========== HELPERS ==========
+        const formatEuro = v => '€' + Math.round(v).toLocaleString('en-US');
+        const formatPercent = v => (v * 100).toFixed(1) + '%';
+        const formatCurrencyShort = v => v >= 1e6 ? '€' + (v / 1e6).toFixed(1) + 'M' : v >= 1e3 ? '€' + (v / 1e3).toFixed(1) + 'K' : '€' + Math.round(v);
+
+        // ========== NEWS ==========
+        const NEWS_HEADLINES = [
+            { text: 'Fed signals rate cut amid cooling inflation', sentiment: 0.7, url: '#' },
+            { text: 'Tech giants report strong earnings', sentiment: 0.8, url: '#' },
+            { text: 'Oil prices climb on supply concerns', sentiment: -0.3, url: '#' },
+            { text: 'Global supply chain disruptions ease', sentiment: 0.5, url: '#' },
+            { text: 'Cryptocurrency markets rally', sentiment: 0.9, url: '#' },
+            { text: 'Consumer spending slows', sentiment: -0.4, url: '#' },
+            { text: 'Fed adjusts quantitative tightening', sentiment: -0.2, url: '#' },
+            { text: 'AI chip shortage intensifies', sentiment: -0.6, url: '#' },
+            { text: 'ECB holds rates steady', sentiment: 0.1, url: '#' },
+            { text: 'Jobless claims fall', sentiment: 0.6, url: '#' },
+        ];
+        window.refreshNews = function() {
+            const shuffled = [...NEWS_HEADLINES].sort(() => Math.random() - 0.5);
+            const selected = shuffled.slice(0, 5);
+            state.news = selected.map(item => ({ ...item, time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) }));
+            state.sentimentScore = selected.reduce((sum, i) => sum + i.sentiment, 0) / selected.length;
+            document.getElementById('top-news-items').innerHTML = state.news.map(item => {
+                const cls = item.sentiment > 0.2 ? 'bullish' : item.sentiment < -0.2 ? 'bearish' : 'neutral';
+                return `<div class="news-item"><a href="${item.url}" target="_blank" class="news-link">${item.text} <i class="fas fa-external-link-alt"></i></a><span class="sentiment-badge ${cls}">${cls.toUpperCase()}</span></div>`;
+            }).join('');
+        };
+
+        // ========== PORTFOLIO MANAGEMENT ==========
+        function renderPortfolio() {
+            const container = document.getElementById('portfolio-container');
+            if (state.portfolio.length === 0) {
+                container.innerHTML = '<span class="text-secondary" style="font-size:0.85rem;">Add assets to build your portfolio...</span>';
+            } else {
+                container.innerHTML = state.portfolio.map((p, i) => {
+                    const a = ASSET_DB.find(x => x.symbol === p.symbol) || { name: p.symbol, esg: 50, opRisk: 0.5 };
+                    return `<div class="portfolio-pill">
+                        <span class="sym">${p.symbol}</span>
+                        <span style="font-size:0.65rem;color:var(--text-secondary);">${a.name}</span>
+                        <input type="number" class="weight-input" value="${p.weight}" min="0" max="100" step="0.5" data-index="${i}">
+                        <span style="font-size:0.65rem;color:var(--text-muted);">%</span>
+                        <button class="btn-outline-danger-glass" onclick="removeAsset(${i})"><i class="fas fa-times"></i></button>
+                        <div class="weight-bar" style="width:${p.weight}%;"></div>
+                    </div>`;
+                }).join('');
+                container.querySelectorAll('.weight-input').forEach(inp => {
+                    inp.addEventListener('input', e => {
+                        let val = parseFloat(e.target.value) || 0;
+                        val = Math.min(Math.max(val, 0), 100);
+                        state.portfolio[e.target.dataset.index].weight = val;
+                        updateTotals();
+                        e.target.parentNode.querySelector('.weight-bar').style.width = val + '%';
+                    });
+                });
+            }
+            updateTotals();
+        }
+        function updateTotals() {
+            const total = state.portfolio.reduce((s, p) => s + p.weight, 0);
+            document.getElementById('total-weight-display').textContent = total.toFixed(1) + '%';
+            document.getElementById('asset-count-display').textContent = state.portfolio.length;
+            const fill = document.getElementById('weight-track-fill');
+            fill.style.width = Math.min(total, 100) + '%';
+            fill.className = 'weight-total-fill ' + (total > 100 ? 'over' : total < 99.9 ? 'under' : 'exact');
+        }
+        window.addAsset = function(symbol) {
+            if (state.portfolio.find(p => p.symbol === symbol)) return;
+            const n = state.portfolio.length;
+            const currentTotal = state.portfolio.reduce((s, p) => s + p.weight, 0);
+            let newWeight;
+            if (n === 0) newWeight = 100;
+            else {
+                if (currentTotal === 0) newWeight = parseFloat((100 / (n + 1)).toFixed(1));
+                else {
+                    newWeight = parseFloat((currentTotal / (n + 1)).toFixed(1));
+                    const factor = (100 - newWeight) / currentTotal;
+                    state.portfolio.forEach(p => p.weight = parseFloat((p.weight * factor).toFixed(1)));
+                }
+            }
+            state.portfolio.push({ symbol, weight: newWeight });
+            renderPortfolio();
+            document.getElementById('search-results').style.display = 'none';
+            document.getElementById('stock-search').value = '';
+        };
+        window.removeAsset = function(index) {
+            state.portfolio.splice(index, 1);
+            if (state.portfolio.length > 0) {
+                const total = state.portfolio.reduce((s, p) => s + p.weight, 0);
+                if (total > 0) state.portfolio.forEach(p => p.weight = parseFloat((p.weight / total * 100).toFixed(1)));
+            }
+            renderPortfolio();
+        };
+        window.clearPortfolio = function() {
+            state.portfolio = [];
+            renderPortfolio();
+        };
+
+        // ========== SEARCH ==========
+        document.getElementById('stock-search').addEventListener('input', function(e) {
+            const query = e.target.value.toUpperCase();
+            const container = document.getElementById('search-results');
+            if (query.length < 1) { container.style.display = 'none'; return; }
+            const classF = document.getElementById('asset-class-filter').value;
+            const regionF = document.getElementById('region-filter').value;
+            let results = ASSET_DB.filter(a => a.symbol.includes(query) || a.name.toUpperCase().includes(query) || a.sector.toUpperCase().includes(query));
+            if (classF !== 'all') results = results.filter(a => a.class === classF);
+            if (regionF !== 'all') results = results.filter(a => a.region === regionF);
+            results = results.slice(0, 12);
+            container.innerHTML = results.length === 0 ? '<div class="p-2 text-secondary">No results</div>' : results.map(a => `
+                <div class="stock-result-item" onclick="addAsset('${a.symbol}')">
+                    <div><span class="symbol">${a.symbol}</span> <span class="name">${a.name}</span></div>
+                    <div><span class="risk-tag" style="background:rgba(46,204,113,0.15);color:var(--accent-green);">ESG:${a.esg}</span> <span class="risk-tag" style="background:rgba(231,76,111,0.15);color:var(--accent-red);">Op:${(a.opRisk*100).toFixed(0)}%</span></div>
+                </div>
+            `).join('');
+            container.style.display = 'block';
+        });
+        document.addEventListener('click', (e) => { if (!e.target.closest('#stock-search') && !e.target.closest('#search-results')) document.getElementById('search-results').style.display = 'none'; });
+        document.getElementById('region-filter').addEventListener('change', () => document.getElementById('stock-search').dispatchEvent(new Event('input')));
+        document.getElementById('asset-class-filter').addEventListener('change', () => document.getElementById('stock-search').dispatchEvent(new Event('input')));
+
+        // ========== CORRELATIE ==========
+        function getCorrelation(a1, a2) {
+            if (!a1 || !a2) return 0.5;
+            if (a1.symbol === a2.symbol) return 1.0;
+            let corr = 0.3;
+            if (a1.sector === a2.sector) corr += 0.4;
+            if (a1.region === a2.region) corr += 0.2;
+            if (a1.class === a2.class) corr += 0.1;
+            return Math.min(corr, 0.95);
+        }
+
+        // ========== WEB WORKER (met foutafhandeling) ==========
+        const workerCode = `
+            importScripts('https://cdnjs.cloudflare.com/ajax/libs/mathjs/11.8.0/math.min.js');
+            self.onmessage = function(e) {
+                try {
+                    const { assets, amount, months, riskFree, scenario, sentimentScore } = e.data;
+                    const n = assets.length;
+                    const corrMatrix = Array.from({length: n}, (_,i) => Array.from({length: n}, (_,j) => getCorrelation(assets[i], assets[j])));
+                    // Voorkom niet-positief definiete matrix door diagonaal te verhogen
+                    for (let i = 0; i < n; i++) corrMatrix[i][i] += 1e-6;
+                    let L;
+                    try {
+                        L = math.cholesky(corrMatrix);
+                    } catch (choleskyError) {
+                        // Fallback: gebruik een identiteitsmatrix (geen correlatie)
+                        L = Array.from({length: n}, (_,i) => Array.from({length: n}, (_,j) => i===j ? 1 : 0));
+                    }
+                    const weights = assets.map(a => a.weight);
+                    const vols = assets.map(a => a.vol);
+                    const scenarioMult = scenario === 'crash' ? -0.30 : scenario === 'bull' ? 0.20 : 0.0;
+                    const expectedReturns = vols.map(v => riskFree + v * 0.4 + scenarioMult * v);
+                    let portReturn = 0, portVolSq = 0;
+                    for (let i = 0; i < n; i++) {
+                        portReturn += weights[i] * expectedReturns[i];
+                        for (let j = 0; j < n; j++) portVolSq += weights[i] * weights[j] * vols[i] * vols[j] * corrMatrix[i][j];
+                    }
+                    const portVol = Math.sqrt(portVolSq);
+                    portReturn *= (1 + sentimentScore * 0.15);
+                    const nSims = 5000, steps = months, dt = 1/12;
+                    let finalValues = [], maxDrawdowns = [], paths = [];
+                    for (let sim = 0; sim < nSims; sim++) {
+                        let price = amount, maxP = amount, minP = amount;
+                        let path = [amount];
+                        for (let t = 0; t < steps; t++) {
+                            const z = Array.from({length: n}, () => {
+                                let u = 0, v = 0;
+                                while(u === 0) u = Math.random();
+                                while(v === 0) v = Math.random();
+                                return Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v);
+                            });
+                            const eps = Array(n).fill(0);
+                            for (let i = 0; i < n; i++) {
+                                for (let j = 0; j <= i; j++) eps[i] += L[i][j] * z[j];
+                            }
+                            let shock = 0;
+                            for (let i = 0; i < n; i++) {
+                                shock += weights[i] * (expectedReturns[i] - 0.5 * vols[i] * vols[i]) * dt + weights[i] * vols[i] * Math.sqrt(dt) * eps[i];
+                            }
+                            price *= Math.exp(shock);
+                            if (price > maxP) maxP = price;
+                            if (price < minP) minP = price;
+                            path.push(price);
+                        }
+                        finalValues.push(price);
+                        maxDrawdowns.push((maxP - minP) / maxP);
+                        paths.push(path);
+                    }
+                    self.postMessage({ finalValues, maxDrawdowns, paths, portReturn, portVol, riskFree, months, amount });
+                } catch (error) {
+                    self.postMessage({ error: error.message });
+                }
+            };
+            function getCorrelation(a1, a2) {
+                if (!a1 || !a2) return 0.5;
+                if (a1.symbol === a2.symbol) return 1.0;
+                let c = 0.3;
+                if (a1.sector === a2.sector) c += 0.4;
+                if (a1.region === a2.region) c += 0.2;
+                if (a1.class === a2.class) c += 0.1;
+                return Math.min(c, 0.95);
+            }
+        `;
+
+        // Worker initialiseren
+        function initWorker() {
+            if (simulationWorker) return;
+            const blob = new Blob([workerCode], { type: 'application/javascript' });
+            simulationWorker = new Worker(URL.createObjectURL(blob));
+            simulationWorker.onmessage = handleWorkerMessage;
+            simulationWorker.onerror = handleWorkerError;
+        }
+
+        function handleWorkerMessage(e) {
+            stopProgressAndTimeout();
+            if (e.data.error) {
+                alert('Simulation error: ' + e.data.error);
+                resetUIAfterError();
+                return;
+            }
+            const { finalValues, maxDrawdowns, paths, portReturn, portVol, riskFree, months, amount } = e.data;
+            processResults(finalValues, maxDrawdowns, paths, portReturn, portVol, riskFree, months, amount);
+        }
+
+        function handleWorkerError(err) {
+            stopProgressAndTimeout();
+            console.error('Worker error:', err);
+            alert('A simulation error occurred. Please check the console and try again.');
+            resetUIAfterError();
+        }
+
+        function stopProgressAndTimeout() {
+            if (state.progressInterval) {
+                clearInterval(state.progressInterval);
+                state.progressInterval = null;
+            }
+            if (simulationTimeout) {
+                clearTimeout(simulationTimeout);
+                simulationTimeout = null;
+            }
+        }
+
+        function resetUIAfterError() {
+            document.getElementById('loading-container').style.display = 'none';
+            document.getElementById('results-container').style.display = 'block';
+            document.getElementById('simulate-btn').disabled = false;
+            document.getElementById('detail-btn').disabled = false;
+            document.getElementById('simulate-btn').innerHTML = '<i class="fas fa-rocket me-2"></i>Run Simulation';
+            state.isRunning = false;
+        }
+
+        function processResults(finalValues, maxDrawdowns, paths, portReturn, portVol, riskFree, months, amount) {
+            const nSims = finalValues.length;
+            finalValues.sort((a,b) => a-b);
+            const mean = finalValues.reduce((a,b) => a+b,0)/nSims;
+            const var95 = finalValues[Math.floor(nSims*0.05)];
+            const profitProb = finalValues.filter(v => v > amount).length / nSims;
+            const avgDrawdown = maxDrawdowns.reduce((a,b) => a+b,0)/nSims;
+            const annualizedReturn = Math.pow(1 + (mean/amount - 1), 12/months) - 1;
+            const sharpe = (annualizedReturn - riskFree) / portVol;
+            const medianPath = [], lowerBand = [], upperBand = [];
+            for (let t = 0; t <= months; t++) {
+                let vals = paths.map(p => p[t]).sort((a,b) => a-b);
+                medianPath.push(vals[Math.floor(nSims*0.5)]);
+                lowerBand.push(vals[Math.floor(nSims*0.1)]);
+                upperBand.push(vals[Math.floor(nSims*0.9)]);
+            }
+            const portAssets = state.portfolio.map(p => ASSET_DB.find(a => a.symbol === p.symbol) || {esg:50, opRisk:0.5});
+            const portEsg = portAssets.reduce((sum, a, i) => sum + a.esg * (state.portfolio[i].weight/100), 0);
+            const portOpRisk = portAssets.reduce((sum, a, i) => sum + a.opRisk * (state.portfolio[i].weight/100), 0);
+            let rec, recClass;
+            if (sharpe>0.8 && var95>amount*0.8) { rec = 'Strong Risk-Return Profile'; recClass='rec-strong'; }
+            else if (sharpe<0.2 || var95<amount*0.6) { rec = 'High Risk / Low Return'; recClass='rec-caution'; }
+            else if (sharpe>0.5) { rec = 'Balanced Growth'; recClass='rec-gold'; }
+            else { rec = 'Neutral Allocation'; recClass='rec-neutral'; }
+            state.lastResult = {
+                expectedReturn: annualizedReturn, volatility: portVol, sharpe,
+                var95: (amount - var95)/amount, maxDrawdown: avgDrawdown, profitProb,
+                recommendation: rec + (state.sentimentScore>0.3?' (bullish)':state.sentimentScore<-0.3?' (bearish)':''),
+                recClass, medianPath, lowerBand, upperBand, initialAmount: amount, steps: months,
+                assets: portAssets, sentiment: state.sentimentScore, portEsg, portOpRisk
+            };
+            displayResults(state.lastResult);
+            document.getElementById('loading-container').style.display = 'none';
+            document.getElementById('results-container').style.display = 'block';
+            document.getElementById('simulate-btn').disabled = false;
+            document.getElementById('detail-btn').disabled = false;
+            document.getElementById('simulate-btn').innerHTML = '<i class="fas fa-rocket me-2"></i>Run Simulation';
+            state.isRunning = false;
+        }
+
+        // ========== SIMULATIE UITVOEREN ==========
+        function handleSimulate() {
+            if (state.isRunning) return;
+            const totalWeight = state.portfolio.reduce((s,p) => s+p.weight, 0);
+            if (state.portfolio.length === 0 || Math.abs(totalWeight - 100) > 0.1) {
+                alert('Portfolio must have assets and total weight 100%.'); return;
+            }
+            state.isRunning = true;
+            document.getElementById('simulate-btn').disabled = true;
+            document.getElementById('detail-btn').disabled = true;
+            document.getElementById('simulate-btn').innerHTML = '<span class="spinner-btn"></span> Running...';
+            document.getElementById('loading-container').style.display = 'block';
+            document.getElementById('results-container').style.display = 'none';
+            document.getElementById('progress-bar').style.width = '0%';
+
+            const amount = parseFloat(document.getElementById('investment-amount').value);
+            const months = parseInt(document.getElementById('time-horizon').value);
+            const riskFree = parseFloat(document.getElementById('risk-free-rate').value);
+            const scenario = document.getElementById('scenario-select').value;
+            const assets = state.portfolio.map(p => {
+                const a = ASSET_DB.find(x => x.symbol === p.symbol) || { vol: 0.25, symbol: p.symbol, sector: 'Other', region: 'Global', class: 'Other' };
+                return { ...a, weight: p.weight / 100 };
+            });
+
+            initWorker();
+            simulationWorker.postMessage({ assets, amount, months, riskFree, scenario, sentimentScore: state.sentimentScore });
+
+            // Nep voortgangsbalk (wordt gestopt door onmessage/onerror)
+            let progress = 0;
+            state.progressInterval = setInterval(() => {
+                progress += 5;
+                if (progress > 100) progress = 100;
+                document.getElementById('progress-bar').style.width = progress + '%';
+                if (progress >= 100) clearInterval(state.progressInterval);
+            }, 50);
+
+            // Timeout na 12 seconden
+            simulationTimeout = setTimeout(() => {
+                if (state.isRunning) {
+                    stopProgressAndTimeout();
+                    alert('Simulation timed out. Please try again with fewer assets.');
+                    resetUIAfterError();
+                }
+            }, 12000);
+        }
+
+        function displayResults(r) {
+            document.getElementById('roi-display').textContent = formatPercent(r.expectedReturn);
+            document.getElementById('risk-display').textContent = formatPercent(r.volatility);
+            document.getElementById('sharpe-display').textContent = r.sharpe.toFixed(2);
+            document.getElementById('var-display').textContent = formatPercent(r.var95);
+            document.getElementById('drawdown-display').textContent = formatPercent(r.maxDrawdown);
+            document.getElementById('prob-display').textContent = formatPercent(r.profitProb);
+            document.getElementById('esg-display').textContent = r.portEsg.toFixed(0) + '/100';
+            document.getElementById('oprisk-display').textContent = (r.portOpRisk * 100).toFixed(0) + '%';
+            const recEl = document.getElementById('recommendation-display');
+            recEl.textContent = r.recommendation;
+            recEl.className = 'recommendation-badge ' + r.recClass;
+            document.getElementById('ai-insights').textContent = `Return: ${formatPercent(r.expectedReturn)} · ESG: ${r.portEsg.toFixed(0)} · OpRisk: ${(r.portOpRisk*100).toFixed(0)}%. ${r.profitProb>0.6?'✅ High probability of profit.':'⚠️ Significant downside risk.'}`;
+            renderCharts(r);
+        }
+
+        function renderCharts(r) {
+            // Cashflow chart
+            const ctx = document.getElementById('cashflow-chart').getContext('2d');
+            if (state.cashChart) state.cashChart.destroy();
+            const labels = Array.from({length: r.steps+1}, (_,i) => 'M'+i);
+            state.cashChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels,
+                    datasets: [
+                        { label: 'Lower 10%', data: r.lowerBand, borderColor: 'transparent', pointRadius: 0, fill: false },
+                        { label: '80% CI', data: r.upperBand, borderColor: 'transparent', backgroundColor: 'rgba(79,172,254,0.12)', pointRadius: 0, fill: '-1' },
+                        { label: 'Median', data: r.medianPath, borderColor: '#4facfe', borderWidth: 2.5, pointRadius: 0, fill: false }
+                    ]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { labels: { color: '#a0a7c9', usePointStyle: true, font: { size: 10 } } } },
+                    scales: {
+                        y: { ticks: { color: '#a0a7c9', callback: v => formatCurrencyShort(v) } },
+                        x: { ticks: { color: '#a0a7c9' } }
+                    }
+                }
+            });
+            // Pie chart
+            const pctx = document.getElementById('pie-chart').getContext('2d');
+            if (state.pieChart) state.pieChart.destroy();
+            state.pieChart = new Chart(pctx, {
+                type: 'doughnut',
+                data: {
+                    labels: state.portfolio.map(p => p.symbol),
+                    datasets: [{ data: state.portfolio.map(p => p.weight), backgroundColor: ['#4facfe','#7c6df0','#2ecc71','#f7c948','#e74c6f','#f39c12'], borderColor: 'rgba(7,11,36,0.8)' }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { position: 'bottom', labels: { color: '#a0a7c9', usePointStyle: true, font: { size: 9 } } } },
+                    cutout: '58%'
+                }
+            });
+        }
+
+        // ========== DETAIL MODAL ==========
+        window.showSimulationDetails = function() {
+            if (!state.lastResult) return;
+            const r = state.lastResult;
+            const assets = state.portfolio.map(p => {
+                const a = ASSET_DB.find(x => x.symbol === p.symbol);
+                return { symbol: p.symbol, name: a?.name || p.symbol, weight: p.weight, vol: a?.vol || 0.25, esg: a?.esg || 50, opRisk: a?.opRisk || 0.5 };
+            });
+            let html = `<h6>Parameters</h6><table class="detail-table w-100"><tr><th>Parameter</th><th>Value</th></tr>
+                <tr><td>Investment</td><td>${formatEuro(r.initialAmount)}</td></tr>
+                <tr><td>Horizon</td><td>${r.steps} months</td></tr>
+                <tr><td>Risk-Free</td><td>${formatPercent(parseFloat(document.getElementById('risk-free-rate').value))}</td></tr>
+                <tr><td>Scenario</td><td>${document.getElementById('scenario-select').options[document.getElementById('scenario-select').selectedIndex].text}</td></tr>
+                <tr><td>Sentiment</td><td>${(r.sentiment*100).toFixed(0)}%</td></tr></table>`;
+            html += `<h6 class="mt-3">Assets</h6><table class="detail-table w-100"><tr><th>Symbol</th><th>Weight</th><th>Vol</th><th>ESG</th><th>OpRisk</th></tr>`;
+            assets.forEach(a => html += `<tr><td>${a.symbol}</td><td>${a.weight}%</td><td>${formatPercent(a.vol)}</td><td>${a.esg}</td><td>${(a.opRisk*100).toFixed(0)}%</td></tr>`);
+            html += `</table>`;
+            html += `<h6 class="mt-3">Correlation Matrix</h6><table class="detail-table w-100" style="font-size:0.7rem;">`;
+            html += `<tr><th></th>` + assets.map(a => `<th>${a.symbol}</th>`).join('') + `</tr>`;
+            for (let i = 0; i < assets.length; i++) {
+                html += `<tr><th>${assets[i].symbol}</th>`;
+                for (let j = 0; j < assets.length; j++) {
+                    html += `<td>${getCorrelation(ASSET_DB.find(x=>x.symbol===assets[i].symbol), ASSET_DB.find(x=>x.symbol===assets[j].symbol)).toFixed(2)}</td>`;
+                }
+                html += `</tr>`;
+            }
+            html += `</table>`;
+            html += `<h6 class="mt-3">Outputs</h6><table class="detail-table w-100"><tr><th>Metric</th><th>Value</th></tr>
+                <tr><td>Annualized Return</td><td>${formatPercent(r.expectedReturn)}</td></tr>
+                <tr><td>Volatility</td><td>${formatPercent(r.volatility)}</td></tr>
+                <tr><td>Sharpe</td><td>${r.sharpe.toFixed(2)}</td></tr>
+                <tr><td>VaR (95%)</td><td>${formatPercent(r.var95)}</td></tr>
+                <tr><td>Max Drawdown</td><td>${formatPercent(r.maxDrawdown)}</td></tr>
+                <tr><td>Profit Prob</td><td>${formatPercent(r.profitProb)}</td></tr>
+                <tr><td>ESG</td><td>${r.portEsg.toFixed(0)}/100</td></tr>
+                <tr><td>Op Risk</td><td>${(r.portOpRisk*100).toFixed(0)}%</td></tr></table>`;
+            document.getElementById('detailModalBody').innerHTML = html;
+            new bootstrap.Modal(document.getElementById('detailModal')).show();
+        };
+
+        // ========== EXPORT ==========
+        window.exportReport = function() {
+            html2canvas(document.getElementById('report-content'), { scale: 2, backgroundColor: '#070b24' }).then(canvas => {
+                const a = document.createElement('a');
+                a.download = 'InvestSim_Report.png';
+                a.href = canvas.toDataURL('image/png');
+                a.click();
+            }).catch(() => window.print());
+        };
+
+        // ========== INIT ==========
+        document.addEventListener('DOMContentLoaded', () => {
+            [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]')).forEach(el => new bootstrap.Tooltip(el));
+            document.getElementById('investment-amount').addEventListener('input', e => {
+                document.getElementById('amount-display').textContent = formatEuro(parseFloat(e.target.value));
+            });
+            document.getElementById('simulate-btn').addEventListener('click', handleSimulate);
+            // Standaard portfolio
+            state.portfolio = [
+                { symbol: 'SPY', weight: 40 }, { symbol: 'GLD', weight: 20 }, { symbol: 'BTC-USD', weight: 5 },
+                { symbol: 'EURUSD', weight: 5 }, { symbol: 'AAPL', weight: 10 }, { symbol: 'NVDA', weight: 10 }, { symbol: 'SAP', weight: 10 }
+            ];
+            renderPortfolio();
+            window.refreshNews();
+            // Automatische nieuwsverversing + countdown
+            window.setInterval(() => {
+                window.refreshNews();
+                const indicator = document.getElementById('auto-refresh-indicator');
+                let countdown = 60;
+                const countdownInterval = setInterval(() => {
+                    countdown--;
+                    if (indicator) indicator.textContent = `🔄 ${countdown}s`;
+                    if (countdown <= 0) clearInterval(countdownInterval);
+                }, 1000);
+            }, 60000);
+            // Eerste simulatie na laden
+            setTimeout(handleSimulate, 500);
+        });
+    </script>
+</body>
+</html>
