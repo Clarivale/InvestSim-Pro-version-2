@@ -5,7 +5,7 @@ A web-based investment simulator designed to help users learn the basics of stoc
 ## 🚀 Live Demo
 
 
-You can play the game here: 
+You can play the game here: https://clarivale.github.io/InvestSim-Pro-version-2/
 ## 📖 About the Project
 
 InvestSim Pro allows users to practice trading with virtual money. Track your portfolio, buy and sell assets, and see how your investment decisions affect your total balance.
